@@ -22,7 +22,7 @@ const userSchema=new mongoose.Schema({
     ventas: [{  
         codArticulo: {
             type: String,
-            unique:true,
+            
         provedor: true},
 
         unidades: {

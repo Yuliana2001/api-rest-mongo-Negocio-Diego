@@ -1,11 +1,12 @@
 import {User} from '../models/User.js';
 import jwt from 'jsonwebtoken';
+import { generateRefreshToken, generateToken } from '../utils/tokenManager.js';
 export const register= async(req, res)=>{
     const {email, password, rol, ventas} = req.body;
     console.log(req.body);
     try{
 
-       // buscando por emaiol
+       // buscando por email
        let user=await  User.findOne({email});  //guarda el usuario en la base de datos
        if(user) throw ({code: 11000});
        user= new User({email, password, rol, ventas});
@@ -37,8 +38,10 @@ export const login=async(req, res)=>{
             return res.status(403).json({ error: "Contraseña incorrecta" });
         
         //generar el token
-        const token= jwt.sign({uid: user._id}, process.env.JWT_SECRET);
-        return res.json({token});
+        const {token, expiresIn}= generateToken(user.id)
+        generateRefreshToken(user.id, res);
+        
+        return res.json({token, expiresIn});
     }catch(error){
         console.log(error);
         return res.status(500).json({error: 'Error de servidor'});
@@ -46,3 +49,34 @@ export const login=async(req, res)=>{
     
 };
 
+export const infoUser= async(req, res)=>{
+    try{
+        const user=await User.findById(req.uid).lean();
+        return res.json({email: user.email, uid: user.id});
+
+    }catch(error){
+        return res.status(500).json({error: 'error de server'});
+    }
+};
+export const refreshToken= (req, res)=>{
+try{
+    const refreshtokenCookie=req.cookies.refresehToken
+    if(!refreshtokenCookie) throw new Error('No existe el token');
+    const {uid}= jwt.verify(refreshtokenCookie, process.env.JWT_REFRESH);
+    const {token, expiresIn}= generateToken(uid)
+    return res.json({token, expiresIn});
+}catch(error){
+    console.log(error)
+    const TokenVerificationErrors={
+        ['invalid signature']: 'La firma del JWT no es válida',
+        ['jwt expired']:'JWT expirado',
+        ['invalid token']: 'Token no valido',
+        ['No Bearer']:'Utiliza formato Bearer'
+    };
+
+}
+};
+export const logout= (req, res)=>{
+    res.clearCookie('refreshToken')
+    res.json({ok:true})
+}
